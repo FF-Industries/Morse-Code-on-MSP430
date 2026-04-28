@@ -1,0 +1,181 @@
+main.c:
+
+#include <io430.h>
+#include <stdio.h>
+#include "datatypes.h"
+#include "morse_code.h"
+#include "led.h"
+
+Includes necessary header files for MSP430 microcontroller, standard input/output, datatypes, morse code, and LED control.
+
+
+#define SIZE 70
+
+Defines a constant SIZE with a value of 70.
+
+
+char str[SIZE] = "Hello World";
+unsigned int i;
+
+Declares an array str of type char with a size of SIZE, initialized with the string "Hello World".
+Declares an unsigned integer variable i.
+
+
+int main(void) {
+    WDTCTL = WDTPW | WDTHOLD;
+
+The main function starts here, which is the entry point of the program. It sets up the Watchdog Timer Control (WDTCTL) to disable the watchdog timer. The watchdog timer is a hardware component that resets the microcontroller if not serviced regularly. In this case, it's disabled (WDTHOLD) by writing the correct password (WDTPW).
+
+
+P1DIR |= BIT0 | BIT6;
+P1OUT &= ~(BIT0 | BIT6);
+
+Configures the pins P1.0 and P1.6 of the MSP430 microcontroller as output for LEDs.
+P1DIR is a register that sets the direction of the pins, where BIT0 represents pin 0 and BIT6 represents pin 6.
+P1OUT is a register that controls the output state of the pins. By clearing both BIT0 and BIT6, both LEDs are initialized to the OFF state.
+
+
+
+play_morse_code(str);
+
+Calls the function play_morse_code with the array str as an argument. This function will interpret the characters in str and play the corresponding Morse code using the LEDs.
+
+
+turn_off_leds();
+
+Calls the function turn_off_leds, which turns off both LEDs.
+
+
+while(1);
+
+This is an infinite loop, which keeps the program running and prevents it from exiting. The program will continuously run the loop after executing the previous code.
+
+
+#ifndef MORSE_H
+#define MORSE_H
+
+#include "datatypes.h"
+
+void morse_code_read(UINT16 ui_J);
+void play_morse_code(const char* str);
+
+#endif // MORSE_H
+
+This is a header file guard to prevent double inclusion of the header.
+It includes the header file "datatypes.h" to ensure the custom data types are available in this file.
+It declares two functions morse_code_read and play_morse_code, which will be defined in the "morse_code.c" file.
+morse_code.c:
+
+
+
+#include "morse_code.h"
+#include <io430.h>
+#include "datatypes.h"
+
+Includes necessary header files for MSP430 microcontroller, custom data types, and this module's header "morse_code.h".
+
+
+void dot(void) {
+    P1OUT |= BIT0;
+    __delay_cycles(150000);
+    P1OUT &= ~BIT0;
+    __delay_cycles(150000);
+}
+
+Defines a function dot() that represents a single "dot" in Morse code.
+It turns on LED1 (P1.0), waits for a short duration (__delay_cycles), turns off LED1, and waits again to add a small gap between dots and dashes.
+
+
+void dash(void) {
+    P1OUT |= BIT6;
+    __delay_cycles(450000);
+    P1OUT &= ~BIT6;
+    __delay_cycles(150000);
+}
+
+Defines a function dash() that represents a single "dash" in Morse code.
+It turns on LED2 (P1.6), waits for a longer duration than a dot (__delay_cycles), turns off LED2, and waits again to add a small gap between dots and dashes.
+
+
+void space(void) {
+    P1OUT &= ~(BIT0 | BIT6);
+    __delay_cycles(450000);
+}
+
+Defines a function space() that represents a space between characters in Morse code.
+It turns off both LED1 and LED2 (P1.0 and P1.6), waits for a duration to represent a space.
+
+
+void morse_code_read(UINT16 ui_J) {
+    UINT16 ui_K;
+    int M[36][6] = {
+        // Morse Code
+        {2, 0, 1},    // A-Z
+        {4, 1, 0, 0, 0},
+        // ... (other Morse code mappings for alphabets and digits)
+    };
+    for (ui_K = 1; ui_K <= M[ui_J][0]; ui_K++) {
+        if (M[ui_J][ui_K] == 0) {
+            dot();
+        } else if (M[ui_J][ui_K] == 1) {
+            dash();
+        }
+    }
+    space();
+}
+
+Defines the function morse_code_read, which takes an unsigned integer ui_J as input.
+M is a 2D array containing the Morse code mapping for each character. The first dimension (36) represents the number of characters, and the second dimension (6) represents the Morse code sequence.
+It iterates over the Morse code sequence for the given character (indicated by ui_J) and calls the appropriate function dot() or dash() to play the Morse code.
+
+
+void play_morse_code(const char* str) {
+    int index;
+    for (index = 0; str[index] != '\0'; index++) {
+        if (str[index] >= 'a' && str[index] <= 'z')
+            morse_code_read(str[index] - 'a');
+        else if (str[index] >= 'A' && str[index] <= 'Z')
+            morse_code_read(str[index] - 'A');
+        else if (str[index] >= '0' && str[index] <= '9')
+            morse_code_read(str[index] - '0' + 26);
+        else if (str[index] == ' ')
+        {
+            P1OUT &= ~BIT0;
+            __delay_cycles(200000);
+        }
+        else
+            P1OUT |= 0x40;
+    }
+}
+
+Defines the function play_morse_code, which takes a pointer to a constant character str as input (string to be played in Morse code).
+It iterates through the characters of the string until it reaches the null terminator ('\0').
+For each character, it checks if it's a lowercase or uppercase alphabet or a digit, and based on that, it calls the morse_code_read function to play the corresponding Morse code.
+If the character is a space, it turns off LED1 for a short duration to represent the space.
+If the character is not recognizable (neither an alphabet, digit, nor a space), it sets the LED2 (P1.6) as an error indication.
+led.h:
+
+
+#ifndef LED_H
+#define LED_H
+
+void turn_off_leds(void);
+
+#endif // LED_H
+
+This is a header file guard to prevent double inclusion of the header.
+It declares the function turn_off_leds, which will be defined in the "led.c" file.
+led.c:
+
+
+#include "led.h"
+#include <io430.h>
+
+Includes necessary header files for MSP430 microcontroller and this module's header "led.h".
+
+
+void turn_off_leds(void) {
+    P1OUT &= ~(BIT0 | BIT6);
+}
+
+Defines the function turn_off_leds, which turns off both LEDs by clearing BIT0 and BIT6 in the P1OUT register.
